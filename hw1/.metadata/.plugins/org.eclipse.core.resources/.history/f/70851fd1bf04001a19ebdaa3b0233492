@@ -1,0 +1,353 @@
+/***
+* Name: hw15
+* Author: jahangirzafar
+* Description: Creative Part
+When Security gaurd comes near to bad agent it'll start running
+* Tags: Tag1, Tag2, TagN
+***/
+
+model hw15
+
+
+global {
+    int number_of_guests <- 50;
+
+    init {
+		create guest number: number_of_guests with: (hungry:0, thirsty:0, info:{50, 50});
+		
+		create information_center number: 1 returns: center { 
+	     set location <- {50, 50};
+	     set food_stands <- [{10,10},{90,90}];
+	     set drink_stands <- [{10,90},{90,10}];
+	     set security_guards <- [{50,15}];
+		}
+		
+		create food_stand  number: 1  returns: food1 { 
+	     set location <- {10, 10};
+		}
+		
+		create food_stand  number: 1 returns: food2 { 
+	     set location <- {90, 90};
+		}
+		
+		create drinks_stand  number: 1 returns: drinks1 { 
+	     set location <- {10, 90};
+		}
+		
+		create drinks_stand  number: 1 returns: drinks2 { 
+	     set location <- {90, 10};
+		}
+		
+		create security_guard  number: 1 returns: guard { 
+	     set location <- {50, 15};
+		}
+    }
+}
+
+species guest skills: [moving] {
+
+	//0: idle
+	//11: hungry:info
+	//12: hungry:food_store
+	//21: thirsty:info
+	//22: thirsty:food_store
+	//3: go_back
+	//4: misbehave
+	//51: report:info
+	//52: report:guard
+	//53: report:lead
+	
+	int state; 
+
+	int hungry;
+	int thirsty;
+	point info;
+	point food_memory;
+	point drinks_memory;
+	point current_target;
+	
+	guest reported_guest;
+	security_guard guard;
+	security_guard cheasing_guard;
+
+    aspect base {
+    	if(state = 0 or state = 3){
+			draw circle(1) color: #red;
+    	}else if(state = 11 or state = 21 or state = 51){
+    		draw circle(1) color: #yellow;
+    	}
+    	else if(state = 12){
+    		draw circle(1) color: #blue;
+    	} else if(state = 22){
+    		draw circle(1) color: #white;
+    	}else if(state = 4){
+    		draw circle(2) color: #black;
+    	}else if(state = 52 or state = 53){
+    		draw circle(1) color: #purple;
+    	}
+    }
+    
+    reflex dance_reflex when: state = 0 {
+    	do wander;
+    }
+    
+    reflex report_reflex when: state = 0 or state = 3 {
+    	list<guest> nearby_guests <- guest at_distance(4);	
+	 
+	    loop g over: nearby_guests {
+    		ask g {
+    			if(g.state = 4){
+    				myself.reported_guest <- g;
+    				myself.current_target <- info;
+    				myself.state <- 51;
+    			}
+    		}
+		}
+    }
+    
+    reflex bad_reflex when: state = 4 {
+    	do wander speed: 2.0;
+    }
+    
+    reflex run_bad_reflex when: state = 4 {
+    	// gaurd location
+    	security_guard nearby_security <- security_guard closest_to(self);
+    	if (location distance_to(nearby_security) < 10){
+    		//do goto target:nearby_security speed: -1.5;
+    		do wander speed:12.0;
+    	}
+    	
+    }
+    
+    reflex walk_reflex when: state != 0 {
+    	if(state = 53){
+    		current_target <- guard.location;
+    	}
+    	do goto(current_target);
+    }
+    
+    reflex stop_walking_reflex when: state = 3 and location distance_to(current_target) < 2 {
+    		state <- 0;
+    }
+    
+    reflex forget_reflex when: flip(0.005) {
+    		food_memory <- nil;
+    		drinks_memory <- nil;
+    }
+    
+    reflex food_reflex when: (state = 0 or state = 3) and flip(0.1) {
+   		hungry <- hungry + 1;
+   		
+   		if(hungry >= 20){
+   			if(food_memory = nil){   				
+   				state <- 11;
+				current_target <- info;			
+   			} else {
+   				state <- 12;
+				current_target <- food_memory;
+   			}
+   		}
+   	}
+   	
+   	reflex drink_reflex when: (state = 0 or state = 3) and flip(0.1) {
+   		thirsty <- thirsty + 1;
+   		
+   		if(thirsty >= 20){
+   			
+   			if(drinks_memory = nil){   				
+   				state <- 21;
+				current_target <- info;			
+   			} else {
+   				state <- 22;
+				current_target <- drinks_memory;
+   			}			
+   		}
+   	}
+   	
+   	reflex ask_peer when: (state = 11 or state = 21) {
+   		list<guest> nearby_guests <- guest at_distance(2);
+   		
+   		loop g over: nearby_guests {
+    		ask g {
+    			if(myself.state = 11 and g.food_memory != nil){
+    				myself.current_target <- g.food_memory;
+    				myself.food_memory <- myself.current_target;
+    				myself.state <- 12;
+    			} else if(myself.state = 21 and g.drinks_memory != nil){
+    				myself.current_target <- g.drinks_memory;
+    				myself.drinks_memory <- myself.current_target;
+    				myself.state <- 22;
+    			}
+    		}
+		}
+   		
+   	}
+   	
+   	reflex misbehave when: flip(0.0001){
+   		state <- 4;
+   		hungry <- 0;
+   		thirsty <- 0;
+   	}
+   	
+   	action remove {
+   		do die;
+   	}
+    
+}
+
+species information_center  {
+
+	list<point> food_stands;
+	list<point> drink_stands;
+	list<point> security_guards;
+
+    aspect base {
+		draw square(15) color: #yellow;
+    }
+    
+    reflex redirect {
+	    list<guest> nearby_guests <- guest at_distance(5);	
+	    
+	    loop g over: nearby_guests {
+    		ask g {
+    			if(g.state = 11){
+    				g.current_target <- one_of(myself.food_stands).location;
+    				g.food_memory <- g.current_target;
+    				g.state <- 12;
+    			} else if(g.state = 21){
+    				g.current_target <- one_of(myself.drink_stands).location;
+    				g.drinks_memory <- g.current_target;
+    				g.state <- 22;
+    			} else if(g.state = 51){
+    				g.current_target <- one_of(myself.security_guards).location;
+    				g.state <- 52;
+    			}
+    		}
+		}
+    }
+}
+
+species food_stand  {
+
+    aspect base {
+		draw square(4) color: #blue;
+    }
+    
+    reflex feed {
+	    list<guest> nearby_guests <- guest at_distance(5);	
+	    
+	    loop g over: nearby_guests {
+    		ask g {
+    			if(g.state = 12){
+    				g.hungry <- 0;
+    				g.current_target <- { rnd(20, 80), rnd(20, 80)};
+    				g.state <- 3;
+    			}
+    		}
+		}
+    }
+}
+
+species drinks_stand {
+
+    aspect base {
+    	draw square(4) color: #white;
+    }
+    
+    reflex give_drink {
+	    list<guest> nearby_guests <- guest at_distance(5);	
+	    
+	    loop g over: nearby_guests {
+    		ask g {
+    			if(g.state = 22){
+    				g.thirsty <- 0;
+    				g.current_target <- { rnd(0, 100), rnd(0, 100)};
+    				g.state <- 3;	
+    			}
+    		}
+		}
+    }
+}
+
+species security_guard skills: [moving] {
+	
+	
+	//states
+	//0: idle
+	//1: problem
+	//2: go back
+	int state;
+	
+	guest target;
+	
+	aspect base {
+    	draw circle(3) color: #purple;
+    }
+    
+    reflex go_to_problem when: state = 0 {
+	    list<guest> nearby_guests <- guest at_distance(5);	
+	    
+	    loop g over: nearby_guests {
+    		ask g {
+    			if(g.state = 52 and !dead(g.reported_guest)){
+    				myself.target <- g.reported_guest;
+    				g.guard <- myself;
+    				g.state <- 53;
+    				myself.state <- 1;
+    			} else if (g.state = 52 and dead(g.reported_guest)){
+    				g.current_target <- { rnd(0, 100), rnd(0, 100)};
+    				g.state <- 3;
+    			}
+    		}
+		}
+    }
+    
+    reflex move_reflex when: state = 1 {
+    	do goto(target.location) speed:2.0 ;
+    }
+    
+    reflex solve_problem when: state = 1 or state = 0 {
+	    list<guest> nearby_guests <- guest at_distance(5);	
+	    
+	    loop g over: nearby_guests {
+    		ask g {
+    			if(g.state = 4){
+    				if(g = myself.target){
+	    				myself.state <- 2;					
+    				}
+    				do remove;
+    			} else if(g.state = 53) {
+   					g.current_target <- { rnd(0, 100), rnd(0, 100)};
+    				g.state <- 3;
+    			}
+    		}
+		}
+    }
+    
+    reflex go_idle_reflex when: state = 2 and location distance_to({50, 15}) < 0.1 {
+    	state <- 0;
+    }
+    
+    reflex go_back_reflex when: state = 2 {
+    	do goto({50, 15});
+    }
+    
+    
+}
+
+
+
+experiment MyExperiment type: gui {
+    output {
+		display MyDisplay camera_interaction:false camera_pos:{world.shape.width/2,world.shape.height*2,world.shape.width*2} 
+		camera_look_pos:{world.shape.width,world.shape.height,0} 
+		camera_up_vector:{0.0,-1.0,0.0}type:opengl{
+			image '../images/giphy.gif' refresh: false;
+		    species guest aspect: base;
+		    species security_guard aspect: base;
+		    species information_center aspect: base;
+		    species food_stand aspect: base;
+		    species drinks_stand aspect: base;
+		}
+    }
+}
