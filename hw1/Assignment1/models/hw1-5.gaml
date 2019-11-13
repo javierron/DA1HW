@@ -88,7 +88,7 @@ species guest skills: [moving] {
     }
     
     reflex dance_reflex when: state = 0 {
-    	do wander;
+    	do wander amplitude: 90.0;
     }
     
     reflex report_reflex when: state = 0 or state = 3 {
@@ -105,25 +105,33 @@ species guest skills: [moving] {
 		}
     }
     
-    reflex bad_reflex when: state = 4 {
-    	do wander speed: 2.0;
-    }
-    
-    reflex run_bad_reflex when: state = 4 {
-    	// gaurd location
-    	security_guard nearby_security <- security_guard closest_to(self);
-    	if (location distance_to(nearby_security) < 10){
-    		//do goto target:nearby_security speed: -1.5;
-    		do wander speed:12.0;
-    	}
-    	
-    }
-    
     reflex walk_reflex when: state != 0 {
     	if(state = 53){
     		current_target <- guard.location;
+    	}else if( state != 4){
+	    	do goto(current_target);    		
+    	}else {
+    		int run_away <- 0;
+    		security_guard nearby_security <- security_guard closest_to(self);
+			if (location distance_to(nearby_security) < 25){
+				ask nearby_security {
+					if(nearby_security.state = 1){
+						run_away <- 1;
+						//do goto target:nearby_security speed: -1.0;
+					}else{
+						//do wander speed: 1.5 amplitude: 90.0;
+					}
+				}
+			}else {
+				//do wander speed: 1.5 amplitude: 90.0;
+			}	
+			
+			if(run_away = 1){
+				do goto target:nearby_security speed: -1.0;
+			}else{
+				do wander speed: 1.5 amplitude: 90.0;
+			}
     	}
-    	do goto(current_target);
     }
     
     reflex stop_walking_reflex when: state = 3 and location distance_to(current_target) < 2 {
@@ -303,7 +311,11 @@ species security_guard skills: [moving] {
     }
     
     reflex move_reflex when: state = 1 {
-    	do goto(target.location) speed:2.0 ;
+    	if(location distance_to(target.location) > 15){
+	    	do goto target: target.location speed: 1.5 ;		    	
+    	}else{
+    		do goto target: target.location speed: 3.0 ;
+    	}
     }
     
     reflex solve_problem when: state = 1 or state = 0 {
