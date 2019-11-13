@@ -111,12 +111,26 @@ species guest skills: [moving] {
     	}else if( state != 4){
 	    	do goto(current_target);    		
     	}else {
+    		int run_away <- 0;
     		security_guard nearby_security <- security_guard closest_to(self);
-			//if (location distance_to(nearby_security) < 10){
-			//	do goto target:nearby_security speed: -1.0;
-			//}else {
+			if (location distance_to(nearby_security) < 25){
+				ask nearby_security {
+					if(nearby_security.state = 1){
+						run_away <- 1;
+						//do goto target:nearby_security speed: -1.0;
+					}else{
+						//do wander speed: 1.5 amplitude: 90.0;
+					}
+				}
+			}else {
+				//do wander speed: 1.5 amplitude: 90.0;
+			}	
+			
+			if(run_away = 1){
+				do goto target:nearby_security speed: -1.0;
+			}else{
 				do wander speed: 1.5 amplitude: 90.0;
-			//}	
+			}
     	}
     }
     
@@ -298,7 +312,7 @@ species security_guard skills: [moving] {
     
     reflex move_reflex when: state = 1 {
     	if(location distance_to(target.location) > 15){
-	    	do goto target: target.location speed: 1.0 ;		    	
+	    	do goto target: target.location speed: 1.5 ;		    	
     	}else{
     		do goto target: target.location speed: 3.0 ;
     	}
