@@ -138,7 +138,7 @@ species guest skills: [moving] {
     		state <- 0;
     }
     
-    reflex forget_reflex when: flip(0.005) {
+    reflex forget_reflex when: flip(0.00005) {
     		food_memory <- nil;
     		drinks_memory <- nil;
     }
