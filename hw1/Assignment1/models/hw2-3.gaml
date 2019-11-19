@@ -18,10 +18,6 @@ global {
 		create auctioneer  number: 1  returns: auct { 
 	     set location <- {50, 50};
 		}
-		
-//		create auctioneer  number: 1  returns: auct2 { 
-//	     set location <- {80, 80};
-//		}
     }
 }
 
@@ -48,13 +44,9 @@ species guest skills: [moving, fipa] {
 
 	reflex receive_cfp_from_initiator when: !empty(cfps) {
 		message proposalFromInitiator <- cfps[0];
-		write '(Time ' + time + '): ' + name + ' receives a cfp message from ' + agent(proposalFromInitiator.sender).name + ':' + string(proposalFromInitiator.contents[1]) + ' ' + string(proposalFromInitiator.contents[2]);
+		write '(Time ' + time + '): ' + name + ' receives a cfp message from ' + agent(proposalFromInitiator.sender).name + ':' + string(proposalFromInitiator.contents[1]);
 		if(interest = proposalFromInitiator.contents[1]){
-			if(int(proposalFromInitiator.contents[2]) <= fairPrice ){
-				do propose (message: proposalFromInitiator, contents: ['propose', interest, proposalFromInitiator.contents[2]]);	
-			}else{
-				
-			}
+			do propose (message: proposalFromInitiator, contents: ['propose', interest, fairPrice]);	
 		}else{
 			do refuse (message: proposalFromInitiator, contents: ['not interested'] );		
 		}
@@ -65,7 +57,7 @@ species guest skills: [moving, fipa] {
 		write '(Time ' + time + '): ' + name + ' receives proposals';
 		
 		loop accepted_proposal over: accept_proposals {
-			write '\t' + name + ' Proposal made to ' + accepted_proposal.sender + 'was accepted. Item Bought!';
+			write '\t' + name + ' Proposal made to ' + accepted_proposal.sender + 'was accepted. Item bought for ' + accepted_proposal.contents at 1 +'!';
 			do inform ( message: accepted_proposal, contents: ['OK']);
 		}
 		accept_proposals <- [];
@@ -75,7 +67,7 @@ species guest skills: [moving, fipa] {
 		write '(Time ' + time + '): ' + name + ' receives proposals';
 		
 		loop rejected_proposal over: reject_proposals {
-			write '\t' + name + 'Proposal made to' + rejected_proposal.sender + ' with content was rejected because of ' + rejected_proposal.contents;
+			write '\t' + name + 'Proposal made to' + rejected_proposal.sender + ' was rejected because of ' + rejected_proposal.contents;
 			reject_proposals <- [];
 		}
 	}
@@ -84,14 +76,9 @@ species guest skills: [moving, fipa] {
 species auctioneer skills: [moving, fipa] {
 	
 	int amount <- 0;
-	int auctions <-0;
+	int auctions <- 0;
+	int startPrice <- rnd(200,500);
 	string item <- one_of(['CD','T-shirt','Poster']);
-	
-	
-	int startPrice <- rnd(200 ,500) * 2;
-	int currentPrice <- startPrice;
-	int delta <- 25;
-	bool sold <- true;
 	
 	aspect base {
 		draw circle(20) color: #yellow;
@@ -100,44 +87,50 @@ species auctioneer skills: [moving, fipa] {
 	
 	reflex send_cfp_to_participants when: (time mod 50 = 0) {
 		
+		list<guest> participants <- guest at_distance(20);
 		
-		if(!sold){
-			currentPrice <- currentPrice - delta;
-		}else{
-			currentPrice <- startPrice;
-			sold <- false;
-		}
-		
-		if(currentPrice < startPrice / 2){
-			write 'No proposals above real price were made';
-			sold <- true;
+		if(empty(participants)){
+			write 'No proposals.';
 			return;
 		}
 		
-		list<guest> participants <- guest at_distance(20);
-		
 		write '(Time ' + time + '): ' + name + ' sends a cfp message to all participants';
-		do start_conversation (to: participants, protocol: 'fipa-contract-net', performative: 'cfp', contents: ['Selling', item, currentPrice]);
+		do start_conversation (to: participants, protocol: 'fipa-contract-net', performative: 'cfp', contents: ['Selling', item]);
 	}
 	
 	reflex receive_proposal_messages when: !empty(proposes) {
 		write '(Time ' + time + '): ' + name + ' RECEIVES PROPOSALS';
 		
-		sold <- false;
-
+		list<int> prices;
+		list<message> all_messages <- proposes;
+		
+		if(length(proposes) <= 2){
+			write 'Only one proposal received, cannot continue';
+			return;
+		}
+		
 		loop r over: proposes {
 			message proposal <- r;
 			write '\t' + name + ' receives a propose message from ' + r.sender + ' with content ' + r.contents ;
-			if(!sold){
-				amount <- amount + int(r.contents at 2);
-				auctions <- auctions + 1;
-				do accept_proposal (message: r, contents:['Sold']);
-				sold <- true;
-			}else{
-				do reject_proposal (message: r, contents:['already sold']);
-			}
+			add to: prices item: int(r.contents at 2);
 		}
 		
+		prices <- prices sort_by each;
+		prices <- reverse(prices);
+		
+		write prices;
+		
+		loop r over: all_messages {
+			write "second loop";
+			message proposal <- r;
+			if(r.contents at 2 = prices at 0){
+				amount <- amount + prices at 1;
+				auctions <- auctions + 1;
+				do accept_proposal (message: r, contents:['Sold for ', prices at 1]);			
+			}else{
+				do reject_proposal (message: r, contents:['You were outbid']);
+			}
+		}
 		proposes <- [];
 	}
 	
