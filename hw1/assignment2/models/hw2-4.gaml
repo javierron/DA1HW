@@ -146,6 +146,7 @@ species Auctioneer skills: [moving, fipa] {
 	reflex start_auction when: auction_active and 	auction_start_timeout <= 0 or (nr_buyers_ready = length(agreed_buyers) and nr_buyers_ready > 0)
 		
 	{		
+		wait <- 0;
 		auction_iteration <- auction_iteration + 1;
 				
 		if (auction_iteration > 1)
@@ -292,7 +293,7 @@ species Guest skills: [moving, fipa] {
 		{
 			if (info.contents at 0 = "Starting Auction")
 			{
-				int category <- info.contents at 2;
+				int category <- int(info.contents at 2);
 				if (wanted_categories[category])
 				{				
 					write '(Time ' + time + '): ' + name + " receives a cfp message from " +info.sender+ " that "+info.contents at 0+" of category: " + info.contents at 2;	
@@ -353,7 +354,7 @@ species Guest skills: [moving, fipa] {
 		message proposalFromAuctioneer <- cfps[0];
 		if (proposalFromAuctioneer.contents at 0 = 'Sell for price')
 		{
-			int proposedPrice <- proposalFromAuctioneer.contents at 1;
+			int proposedPrice <- int(proposalFromAuctioneer.contents at 1);
 			if (proposedPrice < accepted_price)
 			{
 				// Accept

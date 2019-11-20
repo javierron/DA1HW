@@ -46,7 +46,7 @@ species guest skills: [moving, fipa] {
 		message proposalFromInitiator <- cfps[0];
 		write '(Time ' + time + '): ' + name + ' receives a cfp message from ' + agent(proposalFromInitiator.sender).name + ':' + string(proposalFromInitiator.contents[1]);
 		if(interest = proposalFromInitiator.contents[1]){
-			do propose (message: proposalFromInitiator, contents: ['propose', interest, fairPrice]);	
+			do propose (message: proposalFromInitiator, contents: ['propose', interest, fairPrice - rnd(1, 10)]);	
 		}else{
 			do refuse (message: proposalFromInitiator, contents: ['not interested'] );		
 		}
@@ -57,7 +57,7 @@ species guest skills: [moving, fipa] {
 		write '(Time ' + time + '): ' + name + ' receives proposals';
 		
 		loop accepted_proposal over: accept_proposals {
-			write '\t' + name + ' Proposal made to ' + accepted_proposal.sender + 'was accepted. Item bought for ' + accepted_proposal.contents at 1 +'!';
+			write '\t' + name + ' Proposal made to ' + accepted_proposal.sender + 'was accepted. Item Bought!';
 			do inform ( message: accepted_proposal, contents: ['OK']);
 		}
 		accept_proposals <- [];
@@ -80,6 +80,7 @@ species auctioneer skills: [moving, fipa] {
 	int startPrice <- rnd(200,500);
 	string item <- one_of(['CD','T-shirt','Poster']);
 	
+	
 	aspect base {
 		draw circle(20) color: #yellow;
 		draw circle(1) color: #green;
@@ -101,32 +102,26 @@ species auctioneer skills: [moving, fipa] {
 	reflex receive_proposal_messages when: !empty(proposes) {
 		write '(Time ' + time + '): ' + name + ' RECEIVES PROPOSALS';
 		
-		list<int> prices;
+		int max <- 0;
+		message max_m;
 		list<message> all_messages <- proposes;
-		
-		if(length(proposes) <= 2){
-			write 'Only one proposal received, cannot continue';
-			return;
-		}
 		
 		loop r over: proposes {
 			message proposal <- r;
 			write '\t' + name + ' receives a propose message from ' + r.sender + ' with content ' + r.contents ;
-			add to: prices item: int(r.contents at 2);
+			if(int(r.contents at 2) > max){
+				max_m <- r;
+				max <- int(r.contents at 2);
+			}
 		}
-		
-		prices <- prices sort_by each;
-		prices <- reverse(prices);
-		
-		write prices;
 		
 		loop r over: all_messages {
 			write "second loop";
 			message proposal <- r;
-			if(r.contents at 2 = prices at 0){
-				amount <- amount + prices at 1;
+			if(r = max_m){
+				amount <- amount + max;
 				auctions <- auctions + 1;
-				do accept_proposal (message: r, contents:['Sold for ', prices at 1]);			
+				do accept_proposal (message: r, contents:['Sold for ', max]);			
 			}else{
 				do reject_proposal (message: r, contents:['You were outbid']);
 			}
